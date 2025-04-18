@@ -12,6 +12,8 @@ import path from 'path';
 import process from 'process';
 import mammoth from 'mammoth';
 import { Document, Packer, Paragraph } from 'docx'; 
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
 // Import pdfjs-dist dynamically where needed
 // import * as pdfjsLib from 'pdfjs-dist'; // Removed static import
 
@@ -214,46 +216,67 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const inputPath = path.join(folder, fileName);
             const outputPath = path.join(folder, outputFileName);
             try {
-                // @ts-ignore: No types for docxyz
-                const docxyz = await import("docxyz");
-                const buffer = await fs.readFile(inputPath);
-                const document = new docxyz.Document(buffer);
-                // Parcours tous les paragraphes et runs pour remplacer les balises
-                document.paragraphs.forEach((paragraph: any) => {
-                    paragraph.runs.forEach((run: any) => {
-                        let text = run.text;
-                        for (const { from, to } of replacements) {
-                            if (typeof text === 'string' && text.includes(from)) {
-                                text = text.split(from).join(to);
-                            }
-                        }
-                        run.text = text;
-                    });
+                const content = await fs.readFile(inputPath);
+                const zip = new PizZip(content);
+                const doc = new Docxtemplater(zip, {
+                    paragraphLoop: true,
+                    linebreaks: true,
+                    // Explicitly define the delimiters used in the template
+                    delimiters: {
+                        start: '{{',
+                        end: '}}'
+                    },
+                    // Handle errors like missing tags gracefully
+                    nullGetter: (tag) => {
+                        console.warn(`Warning: Placeholder '${tag}' not found in provided data.`);
+                        return `{{${tag}}}`;
+                    }
                 });
-                // Parcours aussi les tableaux (si besoin)
-                if (document.tables) {
-                    document.tables.forEach((table: any) => {
-                        table.rows.forEach((row: any) => {
-                            row.cells.forEach((cell: any) => {
-                                cell.paragraphs.forEach((paragraph: any) => {
-                                    paragraph.runs.forEach((run: any) => {
-                                        let text = run.text;
-                                        for (const { from, to } of replacements) {
-                                            if (typeof text === 'string' && text.includes(from)) {
-                                                text = text.split(from).join(to);
-                                            }
-                                        }
-                                        run.text = text;
-                                    });
-                                });
-                            });
-                        });
-                    });
-                }
-                await document.save(outputPath);
+
+                const dataForDocxtemplater = replacements.reduce((acc, { from, to }) => {
+                  const match = from.match(/^{{(.*)}}$/);
+                  if (match && match[1]) {
+                    const key = match[1].trim();
+                    if (key) {
+                        acc[key] = to;
+                    } else {
+                        console.warn(`Skipping replacement: Empty placeholder found inside '{{}}' originating from '${from}'.`);
+                    }
+                  } else {
+                     console.warn(`Skipping replacement: Invalid placeholder format '${from}'. Expected '{{key}}'.`);
+                  }
+                  return acc;
+                }, {} as Record<string, string>);
+
+                doc.render(dataForDocxtemplater);
+
+                const buf = doc.getZip().generate({
+                    type: "nodebuffer",
+                    compression: "DEFLATE",
+                });
+
+                await fs.writeFile(outputPath, buf);
+
                 return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFileName }) }] };
-            } catch (err: any) {
-                return { content: [{ type: "text", text: JSON.stringify({ error: (err?.message || 'Word replace failed') + '. Si le problème persiste, essayez de re-sélectionner le dossier cible avec set_target_folder.' }) }] };
+
+            } catch (error: any) {
+                // Log the full error object for detailed debugging
+                console.error(`Detailed error processing file ${fileName}:`, JSON.stringify(error, null, 2));
+
+                // Extract a potentially more specific explanation if available
+                let specificExplanation = "";
+                if (error.properties && error.properties.explanation) {
+                    specificExplanation = ` Explanation: ${error.properties.explanation}`;
+                }
+
+                // Construct the user-facing error message
+                const errorMessage = error.properties && error.properties.errors ? 
+                    `Template Error: ${error.properties.errors.map((e: any) => `${e.id}: ${e.message}`).join(', ')}` :
+                    error.message;
+                
+                return {
+                    content: [{ type: "text", text: JSON.stringify({ error: `Failed to replace words in ${fileName} and save to ${outputFileName}: ${errorMessage}.${specificExplanation}` }, null, 2) }]
+                };
             }
         }
         case "delete_word_file": {
