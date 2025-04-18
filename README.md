@@ -52,6 +52,36 @@ This is a TypeScript-based MCP server that provides tools to interact with Jira.
 - **Purpose**: Add an attachment to a ticket.
 - **Parameters**: `issueIdOrKey`, `imageUrl`.
 
+## Word Tools
+
+### `set_target_folder`
+- **Purpose**: Set the working folder for Word/file operations. Mandatory before other Word tools.
+- **Parameters**: `folder` (absolute or relative path).
+
+### `get_target_folder`
+- **Purpose**: Get the current working folder.
+- **Parameters**: None.
+
+### `get_current_working_directory`
+- **Purpose**: Get the process current working directory.
+- **Parameters**: None.
+
+### `list_files_in_target`
+- **Purpose**: List files in the current target folder.
+- **Parameters**: None.
+
+### `read_word_content`
+- **Purpose**: Read the text content of a Word (.docx) file.
+- **Parameters**: `fileName` (relative to target folder).
+
+### `replace_word_words`
+- **Purpose**: Replace words in a Word (.docx) file and save as a new file.
+- **Parameters**: `fileName` (input file), `outputFileName` (output file), `replacements` (array of {from, to}).
+
+### `delete_word_file`
+- **Purpose**: Delete a Word (.docx) file in the target folder.
+- **Parameters**: `fileName` (relative to target folder).
+
 ## Development
 
 Install dependencies:

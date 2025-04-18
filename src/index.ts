@@ -127,24 +127,6 @@ const tools = [
         }
     },
     {
-        name: "create_word_from_template",
-        description: "Create a new Word (.docx) file from a text template.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                templateText: { type: "string", description: "Text to put in the Word file." },
-                outputFileName: { type: "string", description: "Name for the new Word file." }
-            },
-            required: ["templateText", "outputFileName"]
-        },
-        outputSchema: {
-            type: "object",
-            properties: {
-                outputFile: { type: "string" }
-            }
-        }
-    },
-    {
         name: "delete_word_file",
         description: "Delete a Word (.docx) file in the target folder.",
         inputSchema: {
@@ -272,26 +254,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFileName }) }] };
             } catch (err: any) {
                 return { content: [{ type: "text", text: JSON.stringify({ error: (err?.message || 'Word replace failed') + '. Si le problème persiste, essayez de re-sélectionner le dossier cible avec set_target_folder.' }) }] };
-            }
-        }
-        case "create_word_from_template": {
-            const folder = ensureTargetFolder();
-            const templateText: string = args.templateText as string;
-            const outputFileName: string = args.outputFileName as string;
-            if (!templateText || !outputFileName) throw new Error("templateText and outputFileName are required");
-            const outputPath = path.join(folder, outputFileName);
-            try {
-                const doc = new Document({
-                    sections: [{
-                        properties: {},
-                        children: [new Paragraph(templateText)]
-                    }]
-                });
-                const packed = await Packer.toBuffer(doc);
-                await fs.writeFile(outputPath, packed);
-                return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFileName }) }] };
-            } catch (err: any) {
-                return { content: [{ type: "text", text: JSON.stringify({ error: (err?.message || 'Word create failed') + '. Si le problème persiste, essayez de re-sélectionner le dossier cible avec set_target_folder.' }) }] };
             }
         }
         case "delete_word_file": {
