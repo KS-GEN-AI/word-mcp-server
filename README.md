@@ -1,11 +1,12 @@
 # Word Editing MCP Server
 
-This server provides tools for interacting with Microsoft Word (.docx) files.
+This server provides tools for interacting with Microsoft Word (.docx) files and converting them to PDF with precise formatting.
 
 This is a TypeScript-based MCP server that provides tools to interact with Word files. It demonstrates core MCP concepts by providing:
 
 - Tools for setting a working directory
 - Tools for reading, modifying, and deleting Word files
+- Tools for converting Word files to PDF (with full formatting)
 
 ## Features
 
@@ -39,29 +40,39 @@ This is a TypeScript-based MCP server that provides tools to interact with Word 
 - **Purpose**: Delete a Word (.docx) file in the target folder.
 - **Parameters**: `fileName` (relative to target folder).
 
-## Development
+### `word_to_pdf`
+- **Purpose**: Convert a Word (.docx) file to PDF, preserving all formatting and images. Requires LibreOffice installed.
+- **Parameters**: `fileName` (input .docx), `outputFileName` (output .pdf)
+- **Note**: This uses LibreOffice in headless mode for professional-quality conversion. If LibreOffice is not installed, see the installation section below.
 
-Install dependencies:
+## Installation complète
+
+Installe les dépendances Node.js :
 ```bash
 npm install
 ```
 
-Build the server:
+Installe LibreOffice (pour la conversion Word → PDF) :
+```bash
+npm run install-libreoffice
+```
+
+Compile le serveur :
 ```bash
 npm run build
 ```
 
-For development with auto-rebuild:
+Pour le développement avec auto-rebuild :
 ```bash
 npm run watch
 ```
 
-## Installation
+## Utilisation avec Claude Desktop
 
-To use with Claude Desktop, add the server config:
+Ajoute la config suivante dans :
 
-On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+Sur MacOS : `~/Library/Application Support/Claude/claude_desktop_config.json`
+Sur Windows : `%APPDATA%/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -78,7 +89,7 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 }
 ```
 
-### Debugging
+## Debugging
 
 Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which is available as a package script:
 

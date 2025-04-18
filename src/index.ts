@@ -8,6 +8,7 @@ import {
     ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import process from 'process';
 import mammoth from 'mammoth';
@@ -142,6 +143,24 @@ const tools = [
             type: "object",
             properties: {
                 deleted: { type: "boolean" }
+            }
+        }
+    },
+    {
+        name: "word_to_pdf",
+        description: "Convert a Word (.docx) file to PDF, preserving all formatting and images. Requires LibreOffice installed.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                fileName: { type: "string", description: "Word file name (relative to target folder)" },
+                outputFileName: { type: "string", description: "Name for the output PDF file." }
+            },
+            required: ["fileName", "outputFileName"]
+        },
+        outputSchema: {
+            type: "object",
+            properties: {
+                outputFile: { type: "string" }
             }
         }
     },
@@ -289,6 +308,68 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return { content: [{ type: "text", text: JSON.stringify({ deleted: true }) }] };
             } catch (err: any) {
                 return { content: [{ type: "text", text: JSON.stringify({ deleted: false, error: (err?.message || 'Unknown error') + '. Si le problème persiste, essayez de re-sélectionner le dossier cible avec set_target_folder.' }) }] };
+            }
+        }
+        case "word_to_pdf": {
+            const folder = ensureTargetFolder();
+            const fileName: string = args.fileName as string;
+            const outputFileName: string = args.outputFileName as string;
+            if (!fileName || !outputFileName) {
+                throw new Error("fileName and outputFileName are required");
+            }
+            const inputPath = path.join(folder, fileName);
+            const outputPath = path.join(folder, outputFileName);
+            try {
+                // Find soffice path
+                const { exec, execSync } = await import('child_process');
+                let sofficePath = '';
+                try {
+                    sofficePath = execSync('which soffice').toString().trim();
+                } catch (e) {
+                    sofficePath = '';
+                }
+                // If not found, try common macOS paths
+                if (!sofficePath) {
+                    const possiblePaths = [
+                        '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+                        '/opt/homebrew/bin/soffice',
+                        '/usr/local/bin/soffice',
+                        '/usr/bin/soffice'
+                    ];
+                    for (const p of possiblePaths) {
+                        try {
+                            if (fsSync.statSync(p)) {
+                                sofficePath = p;
+                                break;
+                            }
+                        } catch {}
+                    }
+                }
+                if (!sofficePath) {
+                    throw new Error("Impossible de trouver la commande 'soffice'. Assure-toi que LibreOffice est installé et que 'soffice' est dans le PATH.");
+                }
+                // Use found soffice path
+                await new Promise((resolve, reject) => {
+                    exec(
+                        `"${sofficePath}" --headless --convert-to pdf --outdir "${folder}" "${inputPath}"`,
+                        (error, stdout, stderr) => {
+                            if (error) {
+                                reject(new Error(`LibreOffice conversion failed: ${stderr || error.message}`));
+                            } else {
+                                resolve(stdout);
+                            }
+                        }
+                    );
+                });
+                // After conversion, the output file will have the same base name but .pdf extension
+                const inputBase = path.basename(fileName, path.extname(fileName));
+                const generatedPdf = path.join(folder, `${inputBase}.pdf`);
+                if (generatedPdf !== outputPath) {
+                    await fs.rename(generatedPdf, outputPath);
+                }
+                return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFileName }) }] };
+            } catch (error: any) {
+                return { content: [{ type: "text", text: JSON.stringify({ error: `Failed to convert ${fileName} to PDF: ${error.message}` }) }] };
             }
         }
         default:
