@@ -1,0 +1,36 @@
+{
+  "name": "jira_communication_server",
+  "version": "0.2.0",
+  "description": "Talk to jira",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "Jira communication server": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "inspector": "npx @modelcontextprotocol/inspector build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "0.6.0",
+    "axios": "^1.7.9",
+    "docx": "^9.4.1",
+    "docxtemplater": "^3.61.1",
+    "docxyz": "^0.2.4",
+    "mammoth": "^1.9.0",
+    "mcp-framework": "^0.1.12",
+    "okhttp": "^1.1.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "pizzip": "^3.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3"
+  }
+}
