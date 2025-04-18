@@ -11,7 +11,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import process from 'process';
 import mammoth from 'mammoth';
-import { Document, Packer, Paragraph } from 'docx';
+import { Document, Packer, Paragraph } from 'docx'; 
 // Import pdfjs-dist dynamically where needed
 // import * as pdfjsLib from 'pdfjs-dist'; // Removed static import
 
