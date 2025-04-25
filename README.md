@@ -4,45 +4,38 @@ This server provides tools for interacting with Microsoft Word (.docx) files and
 
 This is a TypeScript-based MCP server that provides tools to interact with Word files. It demonstrates core MCP concepts by providing:
 
-- Tools for setting a working directory
 - Tools for reading, modifying, and deleting Word files
 - Tools for converting Word files to PDF (with full formatting)
+- All file and folder operations now work directly with absolute or relative paths (relative to the process current working directory). There is no longer any concept of a pre-selected working folder.
 
 ## Features
 
 ## Word Tools
 
-### `set_target_folder`
-- **Purpose**: Set the working folder for Word/file operations. Mandatory before other Word tools.
-- **Parameters**: `folder` (absolute or relative path).
-
-### `get_target_folder`
-- **Purpose**: Get the current working folder.
-- **Parameters**: None.
-
-### `get_current_working_directory`
-- **Purpose**: Get the process current working directory.
-- **Parameters**: None.
-
-### `list_files_in_target`
-- **Purpose**: List files in the current target folder.
-- **Parameters**: None.
+### `list_files_in_folder`
+- **Purpose**: List files in a given folder.
+- **Parameters**: `folderPath` (optional, absolute or relative path to the folder; if omitted, uses the current working directory).
 
 ### `read_word_content`
 - **Purpose**: Read the text content of a Word (.docx) file.
-- **Parameters**: `fileName` (relative to target folder).
+- **Parameters**: `filePath` (absolute or relative path to the .docx file).
 
 ### `replace_word_words`
 - **Purpose**: Replace words in a Word (.docx) file and save as a new file.
-- **Parameters**: `fileName` (input file), `outputFileName` (output file), `replacements` (array of {from, to}).
+- **Parameters**:
+  - `filePath` (input file, absolute or relative path)
+  - `outputFilePath` (output file, absolute or relative path)
+  - `replacements` (array of `{from, to}`)
 
 ### `delete_word_file`
-- **Purpose**: Delete a Word (.docx) file in the target folder.
-- **Parameters**: `fileName` (relative to target folder).
+- **Purpose**: Delete a Word (.docx) file.
+- **Parameters**: `filePath` (absolute or relative path to the .docx file).
 
 ### `word_to_pdf`
 - **Purpose**: Convert a Word (.docx) file to PDF, preserving all formatting and images. Requires LibreOffice installed.
-- **Parameters**: `fileName` (input .docx), `outputFileName` (output .pdf)
+- **Parameters**:
+  - `filePath` (input .docx, absolute or relative path)
+  - `outputFilePath` (output .pdf, absolute or relative path)
 - **Note**: This uses LibreOffice in headless mode for professional-quality conversion. If LibreOffice is not installed, see the installation section below.
 
 ## Installation complète

@@ -19,7 +19,7 @@ import Docxtemplater from 'docxtemplater';
 // import * as pdfjsLib from 'pdfjs-dist'; // Removed static import
 
 // --- Global State ---
-let targetFolder: string | null = null;
+// let targetFolder: string | null = null;
 
 // --- Interface for PDF text elements ---
 interface TextElement {
@@ -42,48 +42,14 @@ const server = new Server(
 // --- Tool Schemas ---
 const tools = [
     {
-        name: "set_target_folder",
-        description: "Set the working folder for Word/file operations. it is mandatory to use this tool before any other tool.",
+        name: "list_files_in_folder",
+        description: "List files in a given folder (absolute or relative to cwd). If no folderPath is provided, uses cwd.",
         inputSchema: {
             type: "object",
             properties: {
-                folder: { type: "string", description: "Absolute or relative path to the folder." }
-            },
-            required: ["folder"]
+                folderPath: { type: "string", description: "Absolute or relative path to the folder." }
+            }
         },
-        outputSchema: {
-            type: "object",
-            properties: {
-                folder: { type: "string" }
-            }
-        }
-    },
-    {
-        name: "get_target_folder",
-        description: "Get the current working folder.",
-        inputSchema: { type: "object", properties: {} },
-        outputSchema: {
-            type: "object",
-            properties: {
-                folder: { type: "string" }
-            }
-        }
-    },
-    {
-        name: "get_current_working_directory",
-        description: "Get the process current working directory.",
-        inputSchema: { type: "object", properties: {} },
-        outputSchema: {
-            type: "object",
-            properties: {
-                cwd: { type: "string" }
-            }
-        }
-    },
-    {
-        name: "list_files_in_target",
-        description: "List files in the current target folder.",
-        inputSchema: { type: "object", properties: {} },
         outputSchema: {
             type: "object",
             properties: {
@@ -93,13 +59,13 @@ const tools = [
     },
     {
         name: "read_word_content",
-        description: "Reads the text content of a Word (.docx) file (relative to target folder) using mammoth.",
+        description: "Reads the text content of a Word (.docx) file (absolute or relative path)",
         inputSchema: {
             type: "object",
             properties: {
-                fileName: { type: "string", description: "Word file name (relative to target folder)" }
+                filePath: { type: "string", description: "Word file path (absolute or relative to cwd)" }
             },
-            required: ["fileName"]
+            required: ["filePath"]
         },
         outputSchema: {
             type: "object",
@@ -112,15 +78,15 @@ const tools = [
     },
     {
         name: "replace_word_words",
-        description: "Replace words in a Word (.docx) file and save as a new file.",
+        description: "Replace words in a Word (.docx) file and save as a new file. Accepts absolute or relative paths.",
         inputSchema: {
             type: "object",
             properties: {
-                fileName: { type: "string", description: "Word file name (relative to target folder)" },
+                filePath: { type: "string", description: "Word file path (absolute or relative to cwd)" },
                 replacements: { type: "array", items: { type: "object", properties: { from: { type: "string" }, to: { type: "string" } }, required: ["from", "to"] } },
-                outputFileName: { type: "string", description: "Name for the new Word file." }
+                outputFilePath: { type: "string", description: "Path for the new Word file (absolute or relative to cwd)." }
             },
-            required: ["fileName", "replacements", "outputFileName"]
+            required: ["filePath", "replacements", "outputFilePath"]
         },
         outputSchema: {
             type: "object",
@@ -131,13 +97,13 @@ const tools = [
     },
     {
         name: "delete_word_file",
-        description: "Delete a Word (.docx) file in the target folder.",
+        description: "Delete a Word (.docx) file (absolute or relative path).",
         inputSchema: {
             type: "object",
             properties: {
-                fileName: { type: "string", description: "Word file name (relative to target folder)" }
+                filePath: { type: "string", description: "Word file path (absolute or relative to cwd)" }
             },
-            required: ["fileName"]
+            required: ["filePath"]
         },
         outputSchema: {
             type: "object",
@@ -148,14 +114,14 @@ const tools = [
     },
     {
         name: "word_to_pdf",
-        description: "Convert a Word (.docx) file to PDF, preserving all formatting and images. Requires LibreOffice installed.",
+        description: "Convert a Word (.docx) file to PDF, preserving all formatting and images. Accepts absolute or relative paths. Requires LibreOffice installed.",
         inputSchema: {
             type: "object",
             properties: {
-                fileName: { type: "string", description: "Word file name (relative to target folder)" },
-                outputFileName: { type: "string", description: "Name for the output PDF file." }
+                filePath: { type: "string", description: "Word file path (absolute or relative to cwd)" },
+                outputFilePath: { type: "string", description: "Path for the output PDF file (absolute or relative to cwd)." }
             },
-            required: ["fileName", "outputFileName"]
+            required: ["filePath", "outputFilePath"]
         },
         outputSchema: {
             type: "object",
@@ -171,40 +137,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const ensureTargetFolder = (): string => {
-        if (!targetFolder) {
-            throw new Error("Target folder not set. Use 'set_target_folder' first.");
-        }
-        return targetFolder;
-    };
     const toolName = request.params.name;
     const args = request.params.arguments || {};
 
     switch (toolName) {
-        case "set_target_folder": {
-            const folder: string = args.folder as string;
-            if (!folder) throw new Error("folder is required");
-            targetFolder = path.resolve(folder);
-            return { content: [{ type: "text", text: JSON.stringify({ folder: targetFolder || null }) }] };
-        }
-        case "get_target_folder": {
-            return { content: [{ type: "text", text: JSON.stringify({ folder: targetFolder || null }) }] };
-        }
-        case "get_current_working_directory": {
-            return { content: [{ type: "text", text: JSON.stringify({ cwd: process.cwd() }) }] };
-        }
-        case "list_files_in_target": {
-            const folder = ensureTargetFolder();
+        case "list_files_in_folder": {
+            const folderPathArg = args.folderPath;
+            const folder = typeof folderPathArg === 'string' && folderPathArg.length > 0 ? path.resolve(folderPathArg) : process.cwd();
             const files = await fs.readdir(folder);
             return { content: [{ type: "text", text: JSON.stringify({ files: Array.isArray(files) ? files : [] }) }] };
         }
         case "read_word_content": {
-            const folder = ensureTargetFolder();
-            const fileName: string = args.fileName as string;
-            if (!fileName) throw new Error("fileName is required.");
-            const filePath = path.join(folder, fileName);
+            const filePath: string = args.filePath as string;
+            if (!filePath) throw new Error("filePath is required.");
+            const absPath = path.resolve(filePath);
             try {
-                const buffer = await fs.readFile(filePath);
+                const buffer = await fs.readFile(absPath);
                 const result = await mammoth.extractRawText({ buffer });
                 const rawText = result.value;
                 const textElements: TextElement[] = rawText.split(/\s+/).map((word, idx) => ({ id: `word_${idx+1}`, text: word }));
@@ -214,38 +162,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         text: JSON.stringify({
                             textElements,
                             rawText,
-                            metadata: {} // No metadata for now
+                            metadata: {}
                         }, null, 2)
                     }]
                 };
             } catch (error: any) {
                 return {
-                    content: [{ type: "text", text: JSON.stringify({ error: `Failed to read or parse Word file at ${filePath}: ${error.message}. Si le problème persiste, essayez de re-sélectionner le dossier cible avec 'set_target_folder'.` }, null, 2) }]
+                    content: [{ type: "text", text: JSON.stringify({ error: `Failed to read or parse Word file at ${absPath}: ${error.message}.` }, null, 2) }]
                 };
             }
         }
         case "replace_word_words": {
-            const folder = ensureTargetFolder();
-            const fileName: string = args.fileName as string;
-            const outputFileName: string = args.outputFileName as string;
+            const filePath: string = args.filePath as string;
+            const outputFilePath: string = args.outputFilePath as string;
             const replacements: { from: string, to: string }[] = args.replacements as { from: string, to: string }[];
-            if (!fileName || !outputFileName || !Array.isArray(replacements)) {
-                throw new Error("fileName, outputFileName et replacements sont requis");
+            if (!filePath || !outputFilePath || !Array.isArray(replacements)) {
+                throw new Error("filePath, outputFilePath et replacements sont requis");
             }
-            const inputPath = path.join(folder, fileName);
-            const outputPath = path.join(folder, outputFileName);
+            const inputPath = path.resolve(filePath);
+            const outputPath = path.resolve(outputFilePath);
             try {
                 const content = await fs.readFile(inputPath);
                 const zip = new PizZip(content);
                 const doc = new Docxtemplater(zip, {
                     paragraphLoop: true,
                     linebreaks: true,
-                    // Explicitly define the delimiters used in the template
                     delimiters: {
                         start: '{{',
                         end: '}}'
                     },
-                    // Handle errors like missing tags gracefully
                     nullGetter: (tag) => {
                         console.warn(`Warning: Placeholder '${tag}' not found in provided data.`);
                         return `{{${tag}}}`;
@@ -276,51 +221,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
                 await fs.writeFile(outputPath, buf);
 
-                return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFileName }) }] };
+                return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFilePath }) }] };
 
             } catch (error: any) {
-                // Log the full error object for detailed debugging
-                console.error(`Detailed error processing file ${fileName}:`, JSON.stringify(error, null, 2));
-
-                // Extract a potentially more specific explanation if available
+                console.error(`Detailed error processing file ${filePath}:`, JSON.stringify(error, null, 2));
                 let specificExplanation = "";
                 if (error.properties && error.properties.explanation) {
                     specificExplanation = ` Explanation: ${error.properties.explanation}`;
                 }
-
-                // Construct the user-facing error message
                 const errorMessage = error.properties && error.properties.errors ? 
                     `Template Error: ${error.properties.errors.map((e: any) => `${e.id}: ${e.message}`).join(', ')}` :
                     error.message;
-                
                 return {
-                    content: [{ type: "text", text: JSON.stringify({ error: `Failed to replace words in ${fileName} and save to ${outputFileName}: ${errorMessage}.${specificExplanation}` }, null, 2) }]
+                    content: [{ type: "text", text: JSON.stringify({ error: `Failed to replace words in ${filePath} and save to ${outputFilePath}: ${errorMessage}.${specificExplanation}` }, null, 2) }]
                 };
             }
         }
         case "delete_word_file": {
-            const folder = ensureTargetFolder();
-            const fileName: string = args.fileName as string;
-            if (!fileName) throw new Error("fileName is required");
-            const filePath = path.join(folder, fileName);
+            const filePath: string = args.filePath as string;
+            if (!filePath) throw new Error("filePath is required");
+            const absPath = path.resolve(filePath);
             try {
-                await fs.unlink(filePath);
+                await fs.unlink(absPath);
                 return { content: [{ type: "text", text: JSON.stringify({ deleted: true }) }] };
             } catch (err: any) {
-                return { content: [{ type: "text", text: JSON.stringify({ deleted: false, error: (err?.message || 'Unknown error') + '. Si le problème persiste, essayez de re-sélectionner le dossier cible avec set_target_folder.' }) }] };
+                return { content: [{ type: "text", text: JSON.stringify({ deleted: false, error: (err?.message || 'Unknown error') }) }] };
             }
         }
         case "word_to_pdf": {
-            const folder = ensureTargetFolder();
-            const fileName: string = args.fileName as string;
-            const outputFileName: string = args.outputFileName as string;
-            if (!fileName || !outputFileName) {
-                throw new Error("fileName and outputFileName are required");
+            const filePath: string = args.filePath as string;
+            const outputFilePath: string = args.outputFilePath as string;
+            if (!filePath || !outputFilePath) {
+                throw new Error("filePath and outputFilePath are required");
             }
-            const inputPath = path.join(folder, fileName);
-            const outputPath = path.join(folder, outputFileName);
+            const inputPath = path.resolve(filePath);
+            const outputPath = path.resolve(outputFilePath);
             try {
-                // Find soffice path
                 const { exec, execSync } = await import('child_process');
                 let sofficePath = '';
                 try {
@@ -328,7 +264,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 } catch (e) {
                     sofficePath = '';
                 }
-                // If not found, try common macOS paths
                 if (!sofficePath) {
                     const possiblePaths = [
                         '/Applications/LibreOffice.app/Contents/MacOS/soffice',
@@ -348,10 +283,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 if (!sofficePath) {
                     throw new Error("Impossible de trouver la commande 'soffice'. Assure-toi que LibreOffice est installé et que 'soffice' est dans le PATH.");
                 }
-                // Use found soffice path
                 await new Promise((resolve, reject) => {
                     exec(
-                        `"${sofficePath}" --headless --convert-to pdf --outdir "${folder}" "${inputPath}"`,
+                        `"${sofficePath}" --headless --convert-to pdf --outdir "${path.dirname(outputPath)}" "${inputPath}"`,
                         (error, stdout, stderr) => {
                             if (error) {
                                 reject(new Error(`LibreOffice conversion failed: ${stderr || error.message}`));
@@ -361,15 +295,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         }
                     );
                 });
-                // After conversion, the output file will have the same base name but .pdf extension
-                const inputBase = path.basename(fileName, path.extname(fileName));
-                const generatedPdf = path.join(folder, `${inputBase}.pdf`);
+                const inputBase = path.basename(inputPath, path.extname(inputPath));
+                const generatedPdf = path.join(path.dirname(outputPath), `${inputBase}.pdf`);
                 if (generatedPdf !== outputPath) {
                     await fs.rename(generatedPdf, outputPath);
                 }
-                return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFileName }) }] };
+                return { content: [{ type: "text", text: JSON.stringify({ outputFile: outputFilePath }) }] };
             } catch (error: any) {
-                return { content: [{ type: "text", text: JSON.stringify({ error: `Failed to convert ${fileName} to PDF: ${error.message}` }) }] };
+                return { content: [{ type: "text", text: JSON.stringify({ error: `Failed to convert ${filePath} to PDF: ${error.message}` }) }] };
             }
         }
         default:
